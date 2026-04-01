@@ -504,10 +504,7 @@
     .section-title { font-size: 32px; }
   }
 </style>
-  <script>
-    window.formspree = window.formspree || function () { (formspree.q = formspree.q || []).push(arguments); };
-  </script>
-  <script src="https://unpkg.com/@formspree/ajax@1" defer></script>
+
 </head>
 <body>
 
@@ -788,7 +785,7 @@
 
     <div class="nav-row">
       <button class="btn btn-back" onclick="goTo(2)">← Back</button>
-      <button type="submit" class="btn btn-submit" id="submitBtn" data-fs-submit-btn>Submit Inquiry ✦</button>
+      <button type="submit" class="btn btn-submit" id="submitBtn">Submit Inquiry ✦</button>
     </div>
   </div>
 
@@ -810,48 +807,22 @@
 <script>
   let currentStep = 0;
 
-  // Init Formspree Ajax
-  window.formspree = window.formspree || function () { (formspree.q = formspree.q || []).push(arguments); };
-  formspree('initForm', { formElement: '#intake-form', formId: 'xojpdwgr' });
-
-  // Listen for Formspree success to show our custom success screen
-  document.addEventListener('DOMContentLoaded', () => {
-    const form = document.getElementById('intake-form');
-    if (form) {
-      form.addEventListener('formspree:success', () => {
-        // Build summary
-        const name = (document.getElementById('firstName').value + ' ' + document.getElementById('lastName').value).trim() || '—';
-        const email = document.getElementById('email').value || '—';
-        const phone = document.getElementById('phone').value || '—';
-        const price = document.getElementById('priceDisplay').textContent;
-        const summaryData = [
-          { key: 'Name', val: name },
-          { key: 'Email', val: email },
-          { key: 'Phone', val: phone },
-          { key: 'Transaction', val: getPills('transType') },
-          { key: 'Property Type', val: getCards('propType') },
-          { key: 'Areas', val: getPills('areas') },
-          { key: 'Budget', val: price },
-          { key: 'Financing', val: getPills('financing') },
-          { key: 'Timeline', val: document.getElementById('timeline').value || '—' },
-          { key: 'Must-Haves', val: getPills('mustHave') },
-        ];
-        document.getElementById('summaryCard').innerHTML = summaryData.map(d =>
-          `<div class="summary-item"><span class="key">${d.key}</span><span class="val">${d.val}</span></div>`
-        ).join('');
-        document.getElementById('s3').classList.remove('active');
-        document.getElementById('success').classList.add('active');
-        document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      });
-    }
-  });
-
   // Inject pill/card values as hidden inputs before submit
   document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('intake-form');
     if (!form) return;
-    form.addEventListener('submit', () => {
+
+    // Handle final form submission with fetch — no redirect
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const submitBtn = document.getElementById('submitBtn');
+      const errorMsg = document.getElementById('errorMsg');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting…';
+      errorMsg.style.display = 'none';
+
+      // Inject dynamic pill/card values as hidden fields
       const fields = {
         otherAgent: getPills('otherAgent'),
         transactionType: getPills('transType'),
@@ -880,6 +851,51 @@
         input.setAttribute('data-dynamic', '1');
         form.appendChild(input);
       });
+
+      // Submit to Formspree via fetch — no redirect
+      try {
+        const response = await fetch('https://formspree.io/f/xojpdwgr', {
+          method: 'POST',
+          body: new FormData(form),
+          headers: { 'Accept': 'application/json' }
+        });
+
+        if (response.ok) {
+          // Build summary card
+          const name = ((document.getElementById('firstName').value || '') + ' ' + (document.getElementById('lastName').value || '')).trim() || '—';
+          const email = document.getElementById('email').value || '—';
+          const phone = document.getElementById('phone').value || '—';
+          const price = document.getElementById('priceDisplay').textContent;
+          const summaryData = [
+            { key: 'Name', val: name },
+            { key: 'Email', val: email },
+            { key: 'Phone', val: phone },
+            { key: 'Transaction', val: getPills('transType') },
+            { key: 'Property Type', val: getCards('propType') },
+            { key: 'Areas', val: getPills('areas') },
+            { key: 'Budget', val: price },
+            { key: 'Financing', val: getPills('financing') },
+            { key: 'Timeline', val: document.getElementById('timeline').value || '—' },
+            { key: 'Must-Haves', val: getPills('mustHave') },
+          ];
+          document.getElementById('summaryCard').innerHTML = summaryData.map(d =>
+            `<div class="summary-item"><span class="key">${d.key}</span><span class="val">${d.val}</span></div>`
+          ).join('');
+          // Show success screen
+          document.getElementById('s3').classList.remove('active');
+          document.getElementById('success').classList.add('active');
+          document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+          errorMsg.style.display = 'block';
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Submit Inquiry ✦';
+        }
+      } catch (err) {
+        errorMsg.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Inquiry ✦';
+      }
     });
   });
 
